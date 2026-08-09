@@ -7,6 +7,7 @@
   font-family: "DM Sans", "Noto Sans SC", sans-serif;
   color: var(--ink);
   background: var(--paper);
+  color-scheme: light;
   font-synthesis: none;
 }
 
@@ -125,23 +126,48 @@ main, footer { width: min(1180px, calc(100% - 56px)); margin: 0 auto; }
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
-.robot-stage { min-width: 0; border-right: 1px solid var(--line); }
-.robot-stage svg { display: block; width: 100%; height: auto; overflow: visible; }
-.sim-grid { color: var(--line); opacity: .56; }
-.sim-grid-line { fill: none; stroke: currentColor; stroke-width: .7; }
-.sim-floor { fill: none; stroke: var(--ink); stroke-width: 1.2; }
-.sim-shadow { fill: var(--ink); opacity: .13; }
-.sim-axis path { fill: none; stroke: var(--muted); stroke-width: 1; }
-.sim-axis text, .joint-labels text, .target-mark text { fill: var(--muted); font: 500 9px "DM Sans", sans-serif; letter-spacing: .08em; }
-.arm-back { fill: none; stroke: var(--paper); stroke-width: 27; stroke-linecap: round; stroke-linejoin: round; }
-.arm-path { fill: none; stroke: var(--ink); stroke-width: 20; stroke-linecap: round; stroke-linejoin: round; }
-.joint-node { fill: var(--paper); stroke: var(--ink); stroke-width: 5; }
-.joint-node-core { fill: var(--accent); }
-.tool-head circle { fill: var(--accent); stroke: var(--paper); stroke-width: 4; }
-.tool-head path { fill: none; stroke: var(--ink); stroke-width: 5; stroke-linecap: round; }
-.target-mark { color: var(--accent); }
-.target-mark circle, .target-mark path { fill: none; stroke: currentColor; stroke-width: 1; }
-.target-mark text { fill: var(--accent); }
+.robot-stage {
+  position: relative;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 55% 38%, rgba(255, 255, 255, .82), transparent 48%),
+    linear-gradient(145deg, #e8e6df, var(--paper));
+}
+.robot-canvas {
+  position: relative;
+  width: 100%;
+  min-height: 500px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.robot-canvas:active { cursor: grabbing; }
+.robot-canvas canvas { display: block; width: 100% !important; height: 100% !important; }
+.canvas-hud {
+  position: absolute;
+  inset: 17px 18px auto;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: .12em;
+  pointer-events: none;
+}
+.canvas-hud span:last-child { color: var(--accent); text-align: right; }
+.webgl-fallback {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 80%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+  text-align: center;
+}
 .robot-controls { display: flex; flex-direction: column; padding: 28px; }
 .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 23px 18px; }
 .control-grid label {
@@ -298,6 +324,8 @@ footer {
   .tcp-readout { margin-top: 25px; text-align: left; }
   .lab-layout { grid-template-columns: 1fr; }
   .robot-stage { border-right: 0; border-bottom: 1px solid var(--line); }
+  .robot-canvas { min-height: 390px; }
+  .canvas-hud { inset: 14px 14px auto; }
   .robot-controls { padding: 24px 0 0; }
   .control-grid { gap: 21px 15px; }
   .preset-controls { margin-top: 10px; }

@@ -42,8 +42,8 @@
       <section class="robot-lab" id="robot-lab" aria-labelledby="robot-lab-title">
         <div class="lab-heading">
           <div>
-            <p class="overline">Interactive Research Demo · 6 DOF</p>
-            <h2 id="robot-lab-title">六轴机械臂仿真</h2>
+            <p class="overline">Interactive Research Demo · UR5 / 6 DOF</p>
+            <h2 id="robot-lab-title">UR5 三维机械臂仿真</h2>
           </div>
           <div class="tcp-readout" aria-live="polite">
             <span>TCP POSITION / mm</span>
@@ -53,49 +53,23 @@
 
         <div class="lab-layout">
           <div class="robot-stage">
-            <svg id="robotSvg" viewBox="0 0 620 420" role="img" aria-labelledby="robotTitle robotDesc">
-              <title id="robotTitle">六轴机械臂运动仿真</title>
-              <desc id="robotDesc">通过六个关节滑块控制机械臂姿态，并实时显示末端位置。</desc>
-              <defs>
-                <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
-                  <path d="M 32 0 L 0 0 0 32" class="sim-grid-line" />
-                </pattern>
-                <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feGaussianBlur stdDeviation="8" />
-                </filter>
-              </defs>
-              <rect class="sim-grid" width="620" height="420" fill="url(#grid)" />
-              <path class="sim-floor" d="M55 359H565" />
-              <ellipse class="sim-shadow" cx="152" cy="358" rx="92" ry="17" filter="url(#softShadow)" />
-              <g class="sim-axis" aria-hidden="true">
-                <path d="M565 356h27M565 356v-27" />
-                <text x="595" y="360">X</text><text x="560" y="324">Z</text>
-              </g>
-              <g id="robotArm">
-                <path id="armBack" class="arm-back" />
-                <path id="armPath" class="arm-path" />
-                <g id="jointNodes"></g>
-                <g id="toolHead" class="tool-head">
-                  <circle r="13" />
-                  <path id="toolGrip" d="M0 0h24m-1-9v18m7-15v10" />
-                </g>
-              </g>
-              <g id="jointLabels" class="joint-labels"></g>
-              <g id="targetMark" class="target-mark">
-                <circle r="15" /><path d="M-22 0H22M0-22V22" />
-                <text x="24" y="-13">TCP</text>
-              </g>
-            </svg>
+            <div id="robotCanvas" class="robot-canvas" role="img" aria-label="可拖动视角的 UR5 六轴机械臂三维仿真">
+              <div class="canvas-hud" aria-hidden="true">
+                <span>UR5 / DH MODEL</span>
+                <span>850 mm REACH · 5 kg PAYLOAD</span>
+              </div>
+              <p id="webglFallback" class="webgl-fallback" hidden>当前浏览器无法启动 3D 视图。</p>
+            </div>
           </div>
 
           <div class="robot-controls">
             <div class="control-grid">
-              <label>J1 · 基座 <output id="j1Value">20°</output><input id="j1" type="range" min="-180" max="180" value="20" /></label>
-              <label>J2 · 肩部 <output id="j2Value">35°</output><input id="j2" type="range" min="-80" max="100" value="35" /></label>
-              <label>J3 · 肘部 <output id="j3Value">-45°</output><input id="j3" type="range" min="-120" max="120" value="-45" /></label>
-              <label>J4 · 腕俯仰 <output id="j4Value">55°</output><input id="j4" type="range" min="-160" max="160" value="55" /></label>
-              <label>J5 · 腕偏转 <output id="j5Value">10°</output><input id="j5" type="range" min="-120" max="120" value="10" /></label>
-              <label>J6 · 末端旋转 <output id="j6Value">0°</output><input id="j6" type="range" min="-180" max="180" value="0" /></label>
+              <label>J1 · Base <output id="j1Value">-20°</output><input id="j1" type="range" min="-180" max="180" value="-20" /></label>
+              <label>J2 · Shoulder <output id="j2Value">-70°</output><input id="j2" type="range" min="-180" max="180" value="-70" /></label>
+              <label>J3 · Elbow <output id="j3Value">85°</output><input id="j3" type="range" min="-180" max="180" value="85" /></label>
+              <label>J4 · Wrist 1 <output id="j4Value">-105°</output><input id="j4" type="range" min="-180" max="180" value="-105" /></label>
+              <label>J5 · Wrist 2 <output id="j5Value">-90°</output><input id="j5" type="range" min="-180" max="180" value="-90" /></label>
+              <label>J6 · Wrist 3 <output id="j6Value">15°</output><input id="j6" type="range" min="-180" max="180" value="15" /></label>
             </div>
             <div class="preset-controls">
               <button type="button" data-pose="home">Home</button>
@@ -103,7 +77,7 @@
               <button type="button" data-pose="print">Print</button>
               <button type="button" id="autoMotion" aria-pressed="false">Auto Motion</button>
             </div>
-            <p class="lab-note">拖动关节参数观察末端执行器轨迹 · 简化正运动学模型</p>
+            <p class="lab-note">拖动视图旋转 / 缩放 · UR5 官方 DH 尺寸比例 · TCP 轨迹实时更新</p>
           </div>
         </div>
       </section>
@@ -210,6 +184,14 @@
       <p>更新于 2025</p>
       <a href="#top">返回顶部 ↑</a>
     </footer>
-    <script src="./app.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>
