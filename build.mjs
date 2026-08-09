@@ -2,6 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 
 await rm('dist', { recursive: true, force: true });
 await mkdir('dist/client', { recursive: true });
+await mkdir('dist/client/assets', { recursive: true });
 await mkdir('dist/server', { recursive: true });
 await mkdir('dist/.openai', { recursive: true });
 
@@ -9,6 +10,7 @@ await Promise.all([
   cp('index.html', 'dist/client/index.html'),
   cp('styles.css', 'dist/client/styles.css'),
   cp('app.js', 'dist/client/app.js'),
+  cp('assets/cui-qiang.jpg', 'dist/client/assets/cui-qiang.jpg'),
   cp('.openai/hosting.json', 'dist/.openai/hosting.json'),
 ]);
 
