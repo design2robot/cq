@@ -17,6 +17,11 @@ const autoButton = document.getElementById('autoMotion');
 const jointInputs = Array.from({ length: 6 }, (_, index) =>
   document.getElementById(`j${index + 1}`)
 );
+const ikInputs = ['X', 'Y', 'Z', 'Rx', 'Ry', 'Rz'].map((axis) => document.getElementById(`ik${axis}`));
+const ikOutputs = ['X', 'Y', 'Z', 'Rx', 'Ry', 'Rz'].map((axis) => document.getElementById(`ik${axis}Value`));
+const ikStatus = document.getElementById('ikStatus');
+const solveIKButton = document.getElementById('solveIK');
+const readTCPButton = document.getElementById('readTCP');
 
 const poses = {
   home: [-20, -70, 85, -105, -90, 15],
@@ -29,7 +34,7 @@ let autoMotion = false;
 let autoStart = 0;
 
 function initRobotLab() {
-  if (!container || jointInputs.some((input) => !input)) return;
+  if (!container || jointInputs.some((input) => !input) || ikInputs.some((input) => !input)) return;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf2f0e9);
@@ -245,34 +250,35 @@ function initRobotLab() {
     opacity: 0.68,
   });
   const trailGeometry = new THREE.BufferGeometry();
+  trailGeometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+  trailGeometry.setDrawRange(0, 0);
   const trail = new THREE.Line(trailGeometry, trailMaterial);
   scene.add(trail);
   const trailPoints = [];
   const worldTCP = new THREE.Vector3();
   const previousTCP = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const poseEuler = new THREE.Euler(0, 0, 0, 'XYZ');
 
-  function updateTCP(addTrailPoint = true) {
+  function readPose() {
     scene.updateMatrixWorld(true);
-    toolTip.getWorldPosition(worldTCP);
-    tcpPosition.textContent = [
-      `X ${Math.round(worldTCP.x * 1000)}`,
-      `Y ${Math.round(worldTCP.z * 1000)}`,
-      `Z ${Math.round(worldTCP.y * 1000)}`,
-    ].join(' · ');
-
-    if (addTrailPoint && worldTCP.distanceTo(previousTCP) > 0.004) {
-      trailPoints.push(worldTCP.clone());
-      if (trailPoints.length > 140) trailPoints.shift();
-      trailGeometry.setFromPoints(trailPoints);
-      previousTCP.copy(worldTCP);
-    }
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    toolTip.getWorldPosition(position);
+    toolTip.getWorldQuaternion(quaternion);
+    return { position, quaternion };
   }
 
-  function applyJointValues(values, addTrailPoint = true) {
-    values.forEach((value, index) => {
-      jointInputs[index].value = Math.round(value);
-      document.getElementById(`j${index + 1}Value`).textContent = `${Math.round(value)}°`;
-    });
+  function orientationVector(targetQuaternion, currentQuaternion) {
+    const delta = targetQuaternion.clone().multiply(currentQuaternion.clone().invert());
+    if (delta.w < 0) delta.multiplyScalar(-1);
+    const vector = new THREE.Vector3(delta.x, delta.y, delta.z);
+    const sine = vector.length();
+    if (sine < 1e-8) return vector.multiplyScalar(2);
+    const angle = 2 * Math.atan2(sine, Math.max(-1, Math.min(1, delta.w)));
+    return vector.multiplyScalar(angle / sine);
+  }
+
+  function setJointTransforms(values) {
     joints[0].rotation.y = radians(values[0]);
     // UR joint signs are mapped to the visual model's local axes.
     joints[1].rotation.z = radians(-values[1]);
@@ -280,11 +286,184 @@ function initRobotLab() {
     joints[3].rotation.z = radians(-values[3]);
     joints[4].rotation.y = radians(values[4]);
     joints[5].rotation.x = radians(values[5]);
-    updateTCP(addTrailPoint);
+  }
+
+  function setIKOutput(values) {
+    const units = [' mm', ' mm', ' mm', '°', '°', '°'];
+    ikOutputs.forEach((output, index) => {
+      if (output) output.textContent = `${Math.round(values[index]).toString().padStart(3, '0')}${units[index]}`;
+    });
+  }
+
+  function setIKTargetFromPose(pose) {
+    poseEuler.setFromQuaternion(pose.quaternion, 'XYZ');
+    const values = [
+      pose.position.x * 1000,
+      pose.position.z * 1000,
+      pose.position.y * 1000,
+      THREE.MathUtils.radToDeg(poseEuler.x),
+      THREE.MathUtils.radToDeg(poseEuler.y),
+      THREE.MathUtils.radToDeg(poseEuler.z),
+    ];
+    values.forEach((value, index) => { ikInputs[index].value = Math.round(value); });
+    setIKOutput(values);
+  }
+
+  function targetPoseFromInputs() {
+    const values = ikInputs.map((input) => Number(input.value));
+    const euler = new THREE.Euler(
+      radians(values[3]),
+      radians(values[4]),
+      radians(values[5]),
+      'XYZ'
+    );
+    return {
+      position: new THREE.Vector3(values[0] / 1000, values[2] / 1000, values[1] / 1000),
+      quaternion: new THREE.Quaternion().setFromEuler(euler),
+      values,
+    };
+  }
+
+  function updateTCP(addTrailPoint = true, syncIKTarget = false) {
+    const pose = readPose();
+    worldTCP.copy(pose.position);
+    tcpPosition.textContent = [
+      `X ${Math.round(worldTCP.x * 1000)}`,
+      `Y ${Math.round(worldTCP.z * 1000)}`,
+      `Z ${Math.round(worldTCP.y * 1000)}`,
+    ].join(' · ');
+
+    if (syncIKTarget) setIKTargetFromPose(pose);
+
+    if (addTrailPoint && worldTCP.distanceTo(previousTCP) > 0.004) {
+      trailPoints.push(worldTCP.clone());
+      if (trailPoints.length > 140) trailPoints.shift();
+      trailGeometry.setFromPoints(trailPoints);
+      trailGeometry.setDrawRange(0, trailPoints.length);
+      previousTCP.copy(worldTCP);
+    }
+  }
+
+  function clearTrail() {
+    trailPoints.length = 0;
+    trailGeometry.setDrawRange(0, 0);
+    previousTCP.set(Infinity, Infinity, Infinity);
+  }
+
+  function applyJointValues(values, addTrailPoint = true, syncIKTarget = false) {
+    values.forEach((value, index) => {
+      jointInputs[index].value = Math.round(value);
+      document.getElementById(`j${index + 1}Value`).textContent = `${Math.round(value)}°`;
+    });
+    setJointTransforms(values);
+    updateTCP(addTrailPoint, syncIKTarget);
   }
 
   function currentValues() {
     return jointInputs.map((input) => Number(input.value));
+  }
+
+  function solveLinearSystem(matrix, vector) {
+    const size = vector.length;
+    const augmented = matrix.map((row, index) => [...row, vector[index]]);
+    for (let column = 0; column < size; column += 1) {
+      let pivot = column;
+      for (let row = column + 1; row < size; row += 1) {
+        if (Math.abs(augmented[row][column]) > Math.abs(augmented[pivot][column])) pivot = row;
+      }
+      if (Math.abs(augmented[pivot][column]) < 1e-10) return Array(size).fill(0);
+      [augmented[column], augmented[pivot]] = [augmented[pivot], augmented[column]];
+      for (let row = column + 1; row < size; row += 1) {
+        const factor = augmented[row][column] / augmented[column][column];
+        for (let value = column; value <= size; value += 1) {
+          augmented[row][value] -= factor * augmented[column][value];
+        }
+      }
+    }
+    const solution = Array(size).fill(0);
+    for (let row = size - 1; row >= 0; row -= 1) {
+      let sum = augmented[row][size];
+      for (let column = row + 1; column < size; column += 1) sum -= augmented[row][column] * solution[column];
+      solution[row] = sum / augmented[row][row];
+    }
+    return solution;
+  }
+
+  function dampedJointStep(jacobian, error, damping = 0.004) {
+    const size = 6;
+    const normal = Array.from({ length: size }, () => Array(size).fill(0));
+    for (let row = 0; row < size; row += 1) {
+      for (let column = 0; column < size; column += 1) {
+        for (let index = 0; index < size; index += 1) normal[row][column] += jacobian[row][index] * jacobian[column][index];
+        if (row === column) normal[row][column] += damping * damping;
+      }
+    }
+    const y = solveLinearSystem(normal, error);
+    return Array.from({ length: size }, (_, column) => {
+      let value = 0;
+      for (let row = 0; row < size; row += 1) value += jacobian[row][column] * y[row];
+      return value;
+    });
+  }
+
+  function solveIK(target) {
+    const lower = -180;
+    const upper = 180;
+    const deltaDegrees = 0.8;
+    let solution = currentValues();
+    let best = solution.slice();
+    let bestMetric = Infinity;
+    let bestPositionError = Infinity;
+    let bestOrientationError = Infinity;
+    const orientationWeight = 0.08;
+
+    for (let iteration = 0; iteration < 140; iteration += 1) {
+      setJointTransforms(solution);
+      const pose = readPose();
+      const positionError = target.position.clone().sub(pose.position);
+      const rotationError = orientationVector(target.quaternion, pose.quaternion);
+      const metric = positionError.length() + rotationError.length() * orientationWeight;
+      if (metric < bestMetric) {
+        bestMetric = metric;
+        best = solution.slice();
+        bestPositionError = positionError.length();
+        bestOrientationError = rotationError.length();
+      }
+      if (positionError.length() < 0.004 && rotationError.length() < radians(4)) break;
+
+      const error = [
+        positionError.x,
+        positionError.y,
+        positionError.z,
+        rotationError.x * orientationWeight,
+        rotationError.y * orientationWeight,
+        rotationError.z * orientationWeight,
+      ];
+      const jacobian = Array.from({ length: 6 }, () => Array(6).fill(0));
+      for (let joint = 0; joint < 6; joint += 1) {
+        const probe = solution.slice();
+        probe[joint] = Math.min(upper, probe[joint] + deltaDegrees);
+        const actualDelta = probe[joint] - solution[joint];
+        if (actualDelta === 0) continue;
+        setJointTransforms(probe);
+        const probePose = readPose();
+        const probeRotation = orientationVector(probePose.quaternion, pose.quaternion);
+        jacobian[0][joint] = (probePose.position.x - pose.position.x) / actualDelta;
+        jacobian[1][joint] = (probePose.position.y - pose.position.y) / actualDelta;
+        jacobian[2][joint] = (probePose.position.z - pose.position.z) / actualDelta;
+        jacobian[3][joint] = (probeRotation.x / actualDelta) * orientationWeight;
+        jacobian[4][joint] = (probeRotation.y / actualDelta) * orientationWeight;
+        jacobian[5][joint] = (probeRotation.z / actualDelta) * orientationWeight;
+      }
+      const step = dampedJointStep(jacobian, error);
+      solution = solution.map((value, index) => Math.max(lower, Math.min(upper, value + step[index] * 0.82)));
+    }
+    setJointTransforms(best);
+    return { values: best, positionError: bestPositionError, orientationError: bestOrientationError };
+  }
+
+  function setIKStatus(message) {
+    if (ikStatus) ikStatus.textContent = message;
   }
 
   function stopAuto() {
@@ -296,17 +475,41 @@ function initRobotLab() {
   jointInputs.forEach((input) => {
     input.addEventListener('input', () => {
       stopAuto();
-      applyJointValues(currentValues());
+      applyJointValues(currentValues(), true, true);
+      setIKStatus('Manual joint control');
     });
+  });
+
+  ikInputs.forEach((input, index) => {
+    input.addEventListener('input', () => {
+      const values = ikInputs.map((item) => Number(item.value));
+      setIKOutput(values);
+      setIKStatus(index < 3 ? 'Position target' : 'Orientation target');
+    });
+  });
+
+  solveIKButton?.addEventListener('click', () => {
+    stopAuto();
+    const target = targetPoseFromInputs();
+    const result = solveIK(target);
+    clearTrail();
+    applyJointValues(result.values, true, false);
+    const positionMillimetres = Math.round(result.positionError * 1000);
+    const orientationDegrees = Math.round(THREE.MathUtils.radToDeg(result.orientationError));
+    const quality = positionMillimetres <= 8 ? 'Solved' : 'Approximate';
+    setIKStatus(`${quality} · ${positionMillimetres} mm / ${orientationDegrees}°`);
+  });
+
+  readTCPButton?.addEventListener('click', () => {
+    setIKTargetFromPose(readPose());
+    setIKStatus('TCP loaded');
   });
 
   document.querySelectorAll('[data-pose]').forEach((button) => {
     button.addEventListener('click', () => {
       stopAuto();
-      trailPoints.length = 0;
-      trailGeometry.setFromPoints(trailPoints);
-      previousTCP.set(Infinity, Infinity, Infinity);
-      applyJointValues(poses[button.dataset.pose]);
+      clearTrail();
+      applyJointValues(poses[button.dataset.pose], true, true);
     });
   });
 
@@ -330,7 +533,7 @@ function initRobotLab() {
   };
   new ResizeObserver(resize).observe(container);
   resize();
-  applyJointValues(currentValues(), false);
+  applyJointValues(currentValues(), false, true);
 
   renderer.setAnimationLoop((time) => {
     if (autoMotion) {

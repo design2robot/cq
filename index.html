@@ -45,6 +45,24 @@
               <label>J5 · Wrist 2 <output id="j5Value">-90°</output><input id="j5" type="range" min="-180" max="180" value="-90" /></label>
               <label>J6 · Wrist 3 <output id="j6Value">15°</output><input id="j6" type="range" min="-180" max="180" value="15" /></label>
             </div>
+            <div class="ik-panel">
+              <div class="ik-heading">
+                <span>INVERSE KINEMATICS · TCP TARGET</span>
+                <output id="ikStatus" aria-live="polite">Ready</output>
+              </div>
+              <div class="ik-grid">
+                <label>X <output id="ikXValue">000 mm</output><input id="ikX" type="range" min="-650" max="650" step="5" value="0" /></label>
+                <label>Y <output id="ikYValue">000 mm</output><input id="ikY" type="range" min="-650" max="650" step="5" value="0" /></label>
+                <label>Z <output id="ikZValue">000 mm</output><input id="ikZ" type="range" min="40" max="850" step="5" value="400" /></label>
+                <label>Rx <output id="ikRxValue">000°</output><input id="ikRx" type="range" min="-180" max="180" step="5" value="0" /></label>
+                <label>Ry <output id="ikRyValue">000°</output><input id="ikRy" type="range" min="-180" max="180" step="5" value="0" /></label>
+                <label>Rz <output id="ikRzValue">000°</output><input id="ikRz" type="range" min="-180" max="180" step="5" value="0" /></label>
+              </div>
+              <div class="ik-actions">
+                <button type="button" id="solveIK">Apply IK</button>
+                <button type="button" id="readTCP">Read TCP</button>
+              </div>
+            </div>
             <div class="preset-controls">
               <button type="button" data-pose="home">Home</button>
               <button type="button" data-pose="reach">Reach</button>
