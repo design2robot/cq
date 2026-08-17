@@ -116,7 +116,7 @@ main, footer { width: min(1180px, calc(100% - 56px)); margin: 0 auto; }
   margin-bottom: 34px;
 }
 .lab-heading .overline { margin: 0 0 17px; }
-.lab-heading h2 { margin: 0; font: 600 clamp(1.8rem, 4vw, 3.2rem) "Noto Serif SC", serif; letter-spacing: -.04em; }
+.lab-heading h1, .lab-heading h2 { margin: 0; font: 600 clamp(1.8rem, 4vw, 3.2rem) "Noto Serif SC", serif; letter-spacing: -.04em; }
 .tcp-readout { text-align: right; }
 .tcp-readout span { display: block; margin-bottom: 8px; color: var(--muted); font-size: 8px; letter-spacing: .14em; }
 .tcp-readout strong { font-size: 11px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
